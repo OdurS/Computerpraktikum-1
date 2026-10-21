@@ -1,153 +1,190 @@
+import ast
+import json
+import queue
+import re
 import subprocess
 import threading
-import queue
 import uuid
-import json
 from pathlib import Path
 
 
 class GAPInterface:
-    """
-    Verwaltet einen dauerhaft laufenden GAP-Prozess.
+    """Dauerhafte Verbindung zwischen Python und GAP."""
 
-    Das Kommunikationsprotokoll verwendet JSON
-    """
-
-    def __init__(self, gap_command="gap"):
+    def __init__(self, gap_command="gap", startup_files=None):
         self.gap_command = gap_command
+        self.startup_files = startup_files or []
         self.process = None
-        self.responses = {}
+        self.output_queue = queue.Queue()
         self.lock = threading.Lock()
-        self.stdout_queue = queue.Queue()
-        self.stderr_queue = queue.Queue()
 
     def start(self):
-        """Startet GAP """
+        """Startet GAP und lädt optional eigene GAP-Dateien."""
 
-        if self.process is not None:
-            if self.process.poll() is None:
-                return
-
-        worker = Path(__file__).parent / "gap" / "worker.g"
+        if self.process is not None and self.process.poll() is None:
+            return
 
         self.process = subprocess.Popen(
-            [self.gap_command, "-q", str(worker)],
+            [self.gap_command, "-q"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
-            bufsize=1
+            bufsize=1,
         )
 
         threading.Thread(
-            target=self._read_stdout,
-            daemon=True
+            target=self._read_output,
+            daemon=True,
         ).start()
 
-        threading.Thread(
-            target=self._read_stderr,
-            daemon=True
-        ).start()
+        for filename in self.startup_files:
+            path = str(Path(filename).resolve())
+            self.execute(f"Read({json.dumps(path, ensure_ascii=False)});")
 
-    def _read_stdout(self):
-        """Liest Antworten aus GAP."""
+    def _read_output(self):
+        """Liest die Ausgabe des GAP-Prozesses kontinuierlich."""
 
         for line in self.process.stdout:
-            self.stdout_queue.put(line.rstrip("\n"))
+            self.output_queue.put(line)
 
-    def _read_stderr(self):
-        """Sammelt Diagnosemeldungen."""
-
-        for line in self.process.stderr:
-            self.stderr_queue.put(line.rstrip("\n"))
-
-    def execute(self, operation, **arguments):
-        """
-        Sendet eine Anfrage an GAP und wartet auf die Antwort.
-
-        Beispiel:
-            execute("multiply", A=[[1, 2]], B=[[3], [4]])
-        """
+    def _send(self, code, marker, timeout=30):
+        """Sendet Code und wartet auf das zugehörige Endsignal."""
 
         if self.process is None or self.process.poll() is not None:
             raise RuntimeError("GAP läuft nicht. Rufe start() auf.")
 
-        request_id = uuid.uuid4().hex
+        self.process.stdin.write(code + "\n")
+        self.process.stdin.flush()
 
-        request = {
-            "id": request_id,
-            "operation": operation,
-            "arguments": arguments
-        }
+        lines = []
 
-        # Die konkrete GAP-Seite muss dieses JSON-Protokoll
-        # implementieren und Antworten mit derselben ID liefern.
-        payload = json.dumps(request, separators=(",", ":"))
+        while True:
+            try:
+                line = self.output_queue.get(timeout=timeout)
+            except queue.Empty as exc:
+                raise TimeoutError(
+                    "GAP hat nicht rechtzeitig geantwortet."
+                ) from exc
+
+            if marker in line:
+                before, _, _ = line.partition(marker)
+                if before:
+                    lines.append(before)
+                return "".join(lines).strip()
+
+            lines.append(line)
+
+    def execute(self, code, timeout=30):
+        """
+        Führt beliebigen GAP-Code aus.
+        Rückgabe: die Textausgabe dieses Codes.
+        """
+
+        marker = "__GAP_DONE_" + uuid.uuid4().hex + "__"
 
         with self.lock:
-            self.process.stdin.write(payload + "\n")
-            self.process.stdin.flush()
+            return self._send(
+                code + f'\nPrint("\\n{marker}\\n");',
+                marker,
+                timeout,
+            )
 
-            while True:
-                try:
-                    line = self.stdout_queue.get(timeout=30)
-                except queue.Empty as exc:
-                    raise TimeoutError(
-                        "Keine Antwort von GAP innerhalb von 30 Sekunden."
-                    ) from exc
+    @staticmethod
+    def _to_gap(value):
+        """Konvertiert einfache Python-Daten in GAP-Ausdrücke."""
 
-                try:
-                    response = json.loads(line)
-                except json.JSONDecodeError:
-                    # Diagnoseausgaben nicht als Protokollantwort behandeln.
-                    continue
+        if value is None:
+            raise TypeError(
+                "None hat keine allgemeine GAP-Entsprechung."
+            )
 
-                if response.get("id") != request_id:
-                    raise RuntimeError(
-                        "Unerwartete Antwort-ID von GAP."
-                    )
+        if isinstance(value, bool):
+            return "true" if value else "false"
 
-                if response.get("status") != "ok":
-                    raise RuntimeError(
-                        response.get("error", "Unbekannter GAP-Fehler.")
-                    )
+        if isinstance(value, int):
+            return str(value)
 
-                return response.get("result")
+        if isinstance(value, float):
+            if not __import__("math").isfinite(value):
+                raise ValueError("NaN und Infinity werden nicht unterstützt.")
+            return repr(value)
 
-    def multiply_matrices(self, A, B):
-        """Multipliziert zwei Matrizen über dem gewählten Zahlbereich."""
+        if isinstance(value, str):
+            return json.dumps(value, ensure_ascii=False)
 
-        return self.execute(
-            "multiply",
-            A=A,
-            B=B
+        if isinstance(value, (list, tuple)):
+            return "[" + ", ".join(
+                GAPInterface._to_gap(item) for item in value
+            ) + "]"
+
+        raise TypeError(
+            f"Nicht unterstützter Python-Datentyp: {type(value).__name__}"
         )
 
-    def determinant(self, A):
-        """Berechnet die Determinante einer Matrix."""
+    @staticmethod
+    def _parse_result(output):
+        """Wandelt einfache GAP-Ausgaben in Python-Werte um."""
 
-        return self.execute(
-            "determinant",
-            A=A
+        output = output.strip()
+
+        try:
+            return ast.literal_eval(output)
+        except (ValueError, SyntaxError):
+            # Komplexere GAP-Objekte bleiben zunächst Text.
+            return output
+
+    def call(self, function_name, *args, timeout=30):
+        """
+        Ruft eine bereits in GAP definierte Funktion auf.
+
+        Beispiel:
+            gap.call("MeineFunktion", [[1, 2], [3, 4]])
+        """
+
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", function_name):
+            raise ValueError("Ungültiger GAP-Funktionsname.")
+
+        arguments = ", ".join(self._to_gap(arg) for arg in args)
+        expression = f"{function_name}({arguments})"
+
+        request_id = uuid.uuid4().hex
+        begin = "__GAP_RESULT_" + request_id + "__"
+        end = "__GAP_DONE_" + request_id + "__"
+
+        code = (
+            f'Print("\\n{begin}\\n");\n'
+            f"Print({expression});\n"
+            f'Print("\\n{end}\\n");'
         )
+
+        with self.lock:
+            output = self._send(code, end, timeout)
+
+        if begin not in output:
+            raise RuntimeError(
+                "GAP lieferte keine gültige Ergebnisantwort: "
+                + output
+            )
+
+        result = output.split(begin, 1)[1]
+        return self._parse_result(result)
 
     def close(self):
         """Beendet den GAP-Prozess."""
 
-        if self.process is None:
-            return
+        if self.process is not None:
+            if self.process.poll() is None:
+                self.process.terminate()
 
-        if self.process.poll() is None:
-            self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait()
 
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-
-        self.process = None
+            self.process = None
 
     def __enter__(self):
         self.start()
