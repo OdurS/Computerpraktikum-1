@@ -1,5 +1,5 @@
 
-class Tableau:
+class Tableau_standard:
     def __init__(self, *parts):
         self.parts = parts
         self.n = sum(parts)
