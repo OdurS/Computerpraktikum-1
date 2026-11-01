@@ -1,5 +1,5 @@
-
-class Tableau:
+#NUtzen?
+class Tableaux:
     def __init__(self, *parts):
         self.parts = parts
 
