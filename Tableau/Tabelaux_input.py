@@ -1,4 +1,4 @@
-
+# wo false zurückdegeben wird muss ausgabe gemacht werden, das eingabe kein standart(soll multi nur für standart definiert werden
 class Tableau_input:
     def __init__(self, rows):
         self.rows = rows
