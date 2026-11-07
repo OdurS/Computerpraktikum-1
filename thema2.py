@@ -1,20 +1,36 @@
 from itertools import permutations
 
 
-def rec_partitions(rest, max_part, current, result):
-    if rest == 0:
-        result.append(tuple(current))
-        return
-    for k in range(min(rest, max_part), 0, -1):
-        current.append(k)
-        rec_partitions(rest - k, k, current, result)
-        current.pop()
-
-
 def partitions(n):
-    result = []
-    rec_partitions(n, n, [], result)
-    return result
+    k = 2
+    a = [0] * (n + 2)
+    a[1] = 0
+    y = n - 1
+
+    while k != 1:
+        k -= 1
+        x = a[k] + 1
+
+        while 2 * x <= y:
+            a[k] = x
+            y -= x
+            k += 1
+
+        l = k + 1
+
+        while x <= y:
+            a[k] = x
+            a[l] = y
+
+            yield tuple(a[1:l + 1])
+
+            x += 1
+            y -= 1
+
+        y = y + x - 1
+        a[k] = y + 1
+
+        yield tuple(a[1:k + 1])
 
 
 def is_standard(T):
