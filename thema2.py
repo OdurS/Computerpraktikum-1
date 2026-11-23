@@ -1,7 +1,21 @@
-from itertools import permutations
+from bisect import bisect_right
 
 
-def partitions(n):
+def _integer(n):
+    if type(n) is not int:
+        raise TypeError("n muss eine ganze Zahl sein.")
+
+
+def _shape(shape):
+    shape = tuple(shape)
+    if any(type(x) is not int or x <= 0 for x in shape):
+        raise ValueError("Die Form muss eine Partition mit positiven Teilen sein.")
+    if any(a < b for a, b in zip(shape, shape[1:])):
+        raise ValueError("Die Zeilenlaengen muessen absteigend geordnet sein.")
+    return shape
+
+
+def rec_partitions(n):
     k = 2
     a = [0] * (n + 2)
     a[1] = 0
@@ -21,50 +35,68 @@ def partitions(n):
         while x <= y:
             a[k] = x
             a[l] = y
-
             yield tuple(a[1:l + 1])
-
             x += 1
             y -= 1
 
         y = y + x - 1
         a[k] = y + 1
-
         yield tuple(a[1:k + 1])
 
 
-def is_standard(T):
-    shape = [len(row) for row in T]
-    if any(length == 0 for length in shape):
-        return False
-    if any(shape[r] < shape[r + 1] for r in range(len(shape) - 1)):
-        return False
+def _rec_partitions(n):
+    _integer(n)
+    if n < 0:
+        return iter(())
+    if n == 0:
+        return iter(((),))
+    return (tuple(reversed(part)) for part in rec_partitions(n))
 
-    values = [x for row in T for x in row]
-    if sorted(values) != list(range(1, len(values) + 1)):
-        return False
+
+def partitions(n):
+    return list(_rec_partitions(n))
+
+
+def count_partitions(n):
+    _integer(n)
+    if n < 0:
+        return 0
+    counts = [1] + [0] * n
+    for part in range(1, n + 1):
+        for total in range(part, n + 1):
+            counts[total] += counts[total - part]
+    return counts[n]
+
+
+def is_semistandard(T):
+    previous_length = None
     for r, row in enumerate(T):
+        if not row or (previous_length is not None and len(row) > previous_length):
+            return False
+        previous_length = len(row)
         for c, x in enumerate(row):
-            if c > 0 and row[c - 1] >= x:
+            if type(x) is not int or x < 1:
                 return False
-            if r > 0 and T[r - 1][c] >= x:
+            if c and row[c - 1] > x:
+                return False
+            if r and T[r - 1][c] >= x:
                 return False
     return True
 
 
-def standard_tableaux(shape):
-    n = sum(shape)
-    result = []
-    for perm in permutations(range(1, n + 1)):
-        T, pos = [], 0
-        for length in shape:
-            T.append(list(perm[pos:pos + length]))
-            pos += length
-        if is_standard(T):
-            result.append(T)
-    return result
+def _check_tableau(T):
+    if not is_semistandard(T):
+        raise ValueError("Erwartet wird ein semistandard Tableau mit positiven ganzen Eintraegen.")
+
+
+def outer_corners(shape):
+    shape = _shape(shape)
+    return [(r, length - 1) for r, length in enumerate(shape)
+            if r + 1 == len(shape) or length > shape[r + 1]]
+
 
 def standard_tableaux_corners(shape):
+    shape = _shape(shape)
     remaining = list(shape)
     T = [[0] * length for length in shape]
     result = []
@@ -87,56 +119,96 @@ def standard_tableaux_corners(shape):
     fill(sum(shape))
     return result
 
-def row_insert(T, x):
-    result = [list(row) for row in T]
-    for row in result:
-        for c, y in enumerate(row):
-            if y > x:
-                row[c], x = x, y
-                break
-        else:
+
+def standard_tableaux(n_or_shape):
+    result = []
+    for shape in partitions(n_or_shape):
+        result.extend(standard_tableaux_corners(shape))
+    return result
+
+
+
+def _row_insert(T, x):
+    for r, row in enumerate(T):
+        if x >= row[-1]:
             row.append(x)
-            return result
-    result.append([x])
+            return r, len(row) - 1
+        c = 0 if x < row[0] else bisect_right(row, x)
+        row[c], x = x, row[c]
+    T.append([x])
+    return len(T) - 1, 0
+
+
+def row_insert(T, x):
+    _check_tableau(T)
+    if type(x) is not int or x < 1:
+        raise ValueError("Der neue Eintrag muss eine positive ganze Zahl sein.")
+    result = [list(row) for row in T]
+    _row_insert(result, x)
     return result
 
 
 def reading_word(T):
+    _check_tableau(T)
     return [x for row in reversed(T) for x in row]
 
 
 def tableau_product_insertion(T, U):
+    _check_tableau(T)
+    _check_tableau(U)
     result = [list(row) for row in T]
-    for x in reading_word(U):
-        result = row_insert(result, x)
+    for row in reversed(U):
+        for x in row:
+            _row_insert(result, x)
     return result
 
 
 def skew_shapes(S):
-    lam = [len(row) for row in S]
+    lam = list(_shape(len(row) for row in S))
     mu = []
-    for row in S:
-        count = 0
-        for x in row:
-            if x is not None:
-                break
-            count += 1
-        mu.append(count)
+    for r, row in enumerate(S):
+        start = 0
+        while start < len(row) and row[start] is None:
+            start += 1
+        if r and start > mu[-1]:
+            raise ValueError("Die inneren Zeilenlaengen muessen absteigend sein.")
+        mu.append(start)
+        for c in range(start, len(row)):
+            x = row[c]
+            if type(x) is not int or x < 1:
+                raise ValueError("None ist nur am Zeilenanfang erlaubt; Eintraege muessen positiv sein.")
+            if c > start and row[c - 1] > x:
+                raise ValueError("Die Zeilen muessen schwach aufsteigend sein.")
+            if r and S[r - 1][c] is not None and S[r - 1][c] >= x:
+                raise ValueError("Die Spalten muessen streng aufsteigend sein.")
     while mu and mu[-1] == 0:
         mu.pop()
     return lam, mu
 
 
 def make_skew(lam, mu, filling):
-    S = []
-    for r in range(len(lam)):
+    lam, mu = _shape(lam), _shape(mu)
+    if len(mu) > len(lam) or any(a > b for a, b in zip(mu, lam)):
+        raise ValueError("Die innere Form muss in der aeusseren Form liegen.")
+    filling = [list(row) for row in filling]
+    if len(filling) != len(lam):
+        raise ValueError("Die Anzahl der Fuellungszeilen passt nicht zur Form.")
+    result = []
+    for r, length in enumerate(lam):
         start = mu[r] if r < len(mu) else 0
-        S.append([None] * start + list(filling[r]))
-    return S
+        if len(filling[r]) != length - start:
+            raise ValueError("Die Anzahl der Eintraege passt nicht zur Schiefform.")
+        result.append([None] * start + filling[r])
+    skew_shapes(result)
+    return result
 
 
+def inner_corners(S):
+    _, mu = skew_shapes(S)
+    return outer_corners(mu)
 
-def _slide_mut(S, corner):
+
+def _slide(S, corner):
     r, c = corner
     while True:
         right = S[r][c + 1] if c + 1 < len(S[r]) else None
@@ -156,18 +228,21 @@ def _slide_mut(S, corner):
 
 
 def jeu_de_taquin_slide(S, corner):
+    corner = tuple(corner)
+    if (len(corner) != 2 or any(type(x) is not int for x in corner)
+            or corner not in inner_corners(S)):
+        raise ValueError("Der Startpunkt muss eine entfernbare Ecke der inneren Form sein.")
     result = [list(row) for row in S]
-    _slide_mut(result, corner)
+    _slide(result, corner)
     return result
 
 
 def rectify(S):
+    _, mu = skew_shapes(S)
     result = [list(row) for row in S]
-    lam, mu = skew_shapes(result)
     while mu:
         r = len(mu) - 1
-        c = mu[r] - 1
-        _slide_mut(result, (r, c))
+        _slide(result, (r, mu[r] - 1))
         mu[r] -= 1
         if mu[r] == 0:
             mu.pop()
@@ -175,12 +250,33 @@ def rectify(S):
 
 
 def make_product_skew(T, U):
+    _check_tableau(T)
+    _check_tableau(U)
     width = len(T[0]) if T else 0
     return [[None] * width + list(row) for row in U] + [list(row) for row in T]
 
 
 def tableau_product_jdt(T, U):
-    return rectify(make_product_skew(T, U))
+    S = make_product_skew(T, U)
+    return rectify(S)
+
+
+def robinson_schensted(perm):
+    perm = list(perm)
+    n = len(perm)
+    seen = bytearray(n + 1)
+    for x in perm:
+        if type(x) is not int or not 1 <= x <= n or seen[x]:
+            raise ValueError("Eingabe muss eine Permutation von 1,...,n sein.")
+        seen[x] = 1
+
+    P, Q = [], []
+    for k, x in enumerate(perm, start=1):
+        r, _ = _row_insert(P, x)
+        if r == len(Q):
+            Q.append([])
+        Q[r].append(k)
+    return P, Q
 
 
 if __name__ == "__main__":
@@ -188,9 +284,11 @@ if __name__ == "__main__":
     U = [[1, 2]]
     S = make_skew([4, 3, 2], [2, 1], [[2, 4], [1, 3], [2, 4]])
 
-    print("Partitionen von 75:", partitions(75), len(partitions(75)))
-    print("Standardtableaux der Form (3,2):", standard_tableaux_corners([3, 2]))
+    print("Partitionen von 5:", partitions(5))
+    print("Anzahl Partitionen von 75:", count_partitions(75))
+    print("Standardtableaux (3,2):", standard_tableaux([3, 2]))
     print("Row Insertion:", row_insert(T, 1))
     print("Produkt durch Einfuegen:", tableau_product_insertion(T, U))
     print("Produkt durch Jeu de taquin:", tableau_product_jdt(T, U))
     print("Rectification:", rectify(S))
+    print("Robinson-Schensted (P,Q):", robinson_schensted([3, 1, 4, 2]))
