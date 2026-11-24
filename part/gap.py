@@ -39,4 +39,9 @@ def GPartitions(n):
 
 n = int(sys.argv[1])
 
-print(len(GPartitions(n)))
+# print(len(GPartitions(n)))
+k = 0
+for partition in GPartitions(n):
+#    print(partition)
+    k+= 1
+print(k)

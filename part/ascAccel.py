@@ -37,7 +37,7 @@ def accel_asc(n):
 n = int(sys.argv[1])
 k = 0
 for partition in accel_asc(n):
-    print(partition)
+#    print(partition)
     k+= 1
 
 print(k)
