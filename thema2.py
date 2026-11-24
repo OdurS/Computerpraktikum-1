@@ -279,6 +279,9 @@ def robinson_schensted(perm):
     return P, Q
 
 
+
+
+
 if __name__ == "__main__":
     T = [[1, 3], [2]]
     U = [[1, 2]]
