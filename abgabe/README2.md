@@ -4,13 +4,10 @@ Dieses Projekt enthält:
 
 - einen Generator für ganzzahlige Partitionen,
 - eine Implementierung von Standard- und Skew-Tableaux,
-- Zeileneinfügung(Row Insertion), Tableau-Produkte und Jeu de Taquin,
+- Zeileneinfügung (Row Insertion), Tableau-Produkte und Jeu de Taquin,
 - Robinson–Schensted,
-- eine kleine grafische Oberfläche mit Tkinter,
-- Vergleichsfunktionen für Partitionen.
-
-Alles ist in reinem Python geschrieben. Es werden keine externen Pakete und
-kein installiertes GAP benötigt.
+- Vergleichsfunktionen für Partitionen,
+- eine kleine grafische Oberfläche mit Tkinter (Details am Ende).
 
 ---
 
@@ -29,6 +26,9 @@ sudo apt install python3-tk
 Alle Befehle in dieser Anleitung werden aus dem Projektordner ausgeführt, also
 aus dem Ordner, in dem `main.py` liegt.
 
+Unter manchen Systemen heißt der Python-Befehl `python3` statt `python`. Die
+Beispiele funktionieren entsprechend auch mit `python3`.
+
 ---
 
 ## 2. Schnellstart
@@ -37,8 +37,8 @@ aus dem Ordner, in dem `main.py` liegt.
 |---|---|
 | `python main.py` | zeigt die kurze Anleitung im Terminal |
 | `python main.py examples` | führt die Beispielsammlung aus |
-| `python main.py gui` | startet die grafische Oberfläche |
 | `python -i main.py` | startet die Anleitung und danach eine interaktive Python-Konsole |
+| `python main.py gui` | startet die grafische Oberfläche (siehe Abschnitt 14) |
 
 Die Terminalausgaben von `main()` und `examples()` sind farbig. Wenn die Ausgabe
 umgeleitet wird oder die Umgebungsvariable `NO_COLOR` gesetzt ist, werden keine
@@ -89,7 +89,8 @@ n_zaehlvergleich = 75
 ```
 
 Diese Werte können direkt geändert werden. Für eigene Experimente ist aber die
-interaktive Konsole oft angenehmer.
+interaktive Konsole oft angenehmer. Die Eingaben werden beim Ausführen geprüft;
+eine Übersicht steht in Abschnitt 11.
 
 ---
 
@@ -114,10 +115,10 @@ main()                     # Anleitung erneut anzeigen
 Außerdem sind unter anderem diese Namen bereits verfügbar:
 
 ```python
-Tableau    # Klassenwrapper um tableau.py
-SkewTableau# Klassenwrapper um tableau.py
-t          # src/tableau.py, die unterliegenden Implementation
-part       # src/partitions.py
+Tableau     # Klassenwrapper um tableau.py
+SkewTableau # Klassenwrapper um tableau.py
+t           # src/tableau.py, die unterliegenden Implementationen
+part        # src/partitions.py
 partitionen_vergleich
 gleiche_partitionen
 ```
@@ -138,58 +139,9 @@ True
 
 ---
 
-## 5. Grafische Oberfläche: `gui()`
+## 5. Tableaux verwenden
 
-Starten mit:
-
-```sh
-python main.py gui
-```
-
-oder aus der interaktiven Konsole:
-
-```python
-gui()
-```
-
-Die Oberfläche hat sechs Seiten:
-
-| Seite | Eingabe | Bedeutung |
-|---|---|---|
-| Partitionen | `75` | zeigt die Partitionen und ihre Anzahl |
-| Standardtableaux | `(3, 2)` oder `5` | Form oder Anzahl der Kästchen |
-| Zeileneinfügung | `[[1, 3], [2]]`, `1` | Tableau und neuer Eintrag |
-| Tableau-Produkt | `[[1, 3], [2]]`, `[[1, 2]]` | zwei Tableaux |
-| Jeu de taquin | `[[None, None, 1, 2], [1, 3], [2]]`, `(0, 1)` | schiefes Tableau und Startpunkt |
-| Robinson–Schensted | `[3, 1, 4, 2]` | Folge verschiedener positiver Zahlen |
-
-Die Eingabefelder werden mit `ast.literal_eval` gelesen. Es müssen also
-**Python-Literale** sein:
-
-- Zahl: `75`
-- Tupel: `(3, 2)`
-- Liste: `[3, 1, 4, 2]`
-- verschachtelte Liste: `[[1, 3], [2]]`
-- leerer Platzhalter in schiefen Tableaux: `None`
-
-Ausdrücke wie `2 + 2` oder Variablennamen wie `n` sind nicht erlaubt. Bei
-ungültigen Eingaben erscheint eine Fehlermeldung im Ausgabefeld, statt dass das
-Programm abstürzt.
-
-Auf der Seite „Jeu de taquin“ gibt es drei Aktionen:
-
-- **Rektifizieren**: reduziert das schiefe Tableau vollständig,
-- **Ein Slide**: führt einen Slide ab dem angegebenen Startpunkt aus,
-- **Formen und Ecken**: zeigt äußere Form, innere Form und innere Ecken.
-
-Der Startpunkt eines Slides ist ein Paar `(Zeile, Spalte)`, beginnend bei `0`.
-Mögliche Startpunkte liefert `S.inner_corners()`.
-
----
-
-## 6. Tableaux verwenden
-
-### 6.1 Ein Tableau anlegen
+### 5.1 Ein Tableau anlegen
 
 ```python
 T = Tableau([[1, 3], [2]])
@@ -201,8 +153,6 @@ Ein gültiges Tableau hat:
 - schwach aufsteigende Einträge innerhalb jeder Zeile,
 - streng aufsteigende Einträge innerhalb jeder Spalte,
 - Zeilenlängen, die von oben nach unten nicht zunehmen.
-
-Ungültige Eingaben werden mit `ValueError` abgelehnt.
 
 Eigenschaften und Prüfungen:
 
@@ -216,7 +166,14 @@ T.reading_word()    # Lesewort von unten nach oben, links nach rechts
 T.outer_corners()   # äußere Ecken als (Zeile, Spalte), ab 0
 ```
 
-### 6.2 Zeileneinfügung
+**Validierung:**
+
+- Die Eingabe muss eine Folge von Zeilen sein.
+- Geprüft werden positive ganzzahlige Einträge, schwache Zeilen, strenge
+  Spalten und nicht zunehmende Zeilenlängen.
+- Die Prüfmethoden ändern das Tableau nicht; `T.shape` berechnet nur die Form.
+
+### 5.2 Zeileneinfügung
 
 ```python
 neu = T.row_insert(4)
@@ -224,10 +181,16 @@ print(neu)
 print(neu.rows)
 ```
 
-`row_insert` verändert `T` nicht, sondern gibt ein neues `Tableau` zurück. Der
-neue Eintrag muss eine positive ganze Zahl sein.
+`row_insert` verändert `T` nicht, sondern gibt ein neues `Tableau` zurück.
 
-### 6.3 Standardtableaux erzeugen
+**Validierung:**
+
+- Der neue Eintrag muss eine positive ganze Zahl sein.
+- Das vorhandene Tableau muss gültig bleiben.
+- `T` selbst wird nicht verändert; das Ergebnis ist ein neues `Tableau`.
+- Ein ungültiger Eintrag führt zu `ValueError`.
+
+### 5.3 Standardtableaux erzeugen
 
 ```python
 alle = Tableau.Standard_Tableaux(3)
@@ -251,7 +214,14 @@ for T in Tableau.Iter_Standard_Tableaux_Corners((4, 3)):
     print(T)
 ```
 
-### 6.4 Zwei Tableaux multiplizieren
+**Validierung:**
+
+- `n` muss eine nichtnegative ganze Zahl sein.
+- `shape` muss eine gültige Partition sein: positive ganze Zahlen und nicht
+  aufsteigende Zeilenlängen.
+- Ein ungültiges `n` oder eine ungültige Form führt zu `ValueError`.
+
+### 5.4 Zwei Tableaux multiplizieren
 
 Gegeben:
 
@@ -277,11 +247,16 @@ S = T + U
 das Skew-Tableau vor der Rektifikation. `T * U` ist also im Wesentlichen
 `(T + U).rectify()`.
 
+**Validierung:**
+
+- `U` muss ein gültiges `Tableau` sein; sonst wird `TypeError` ausgelöst.
+- Beide beteiligten Tableaux müssen die Tableau-Eigenschaften erfüllen.
+
 ---
 
-## 7. Schiefe Tableaux
+## 6. Skew-Tableaux
 
-Ein schiefes Tableau wird mit `SkewTableau` dargestellt. Führende `None`-Werte
+Ein Skew-Tableau wird mit `SkewTableau` dargestellt. Führende `None`-Werte
 markieren Kästchen, die zur inneren Form gehören und nicht gefüllt sind.
 
 ```python
@@ -296,10 +271,10 @@ Wichtige Operationen:
 
 ```python
 S.rows
-S.shape              # (äußere Form, innere Form)
+S.shape                 # (äußere Form, innere Form)
 S.is_skew()
-S.inner_corners()    # mögliche Startpunkte für Slides
-S.jeu_de_taquin((0, 1)) #Jeu de Taquin angewendet auf Ecke (0,1)
+S.inner_corners()       # mögliche Startpunkte für Slides
+S.jeu_de_taquin((0, 1)) # Jeu de Taquin angewendet auf Ecke (0, 1)
 S.rectify()
 ```
 
@@ -308,19 +283,29 @@ S.rectify()
 
 `S.jeu_de_taquin(corner)` gibt wieder ein `SkewTableau` zurück.
 `S.rectify()` gibt ein normales `Tableau` zurück.
-Die Skew-Tableau und Tableau Klassen haben also folgende Relation:
-```
 
+Die Skew-Tableau- und Tableau-Klassen haben also folgende Relation:
+
+```text
                 T + U
         -------------------->
 Tableau                       Skew-Tableau
         <--------------------
              S.rectify()
 ```
-```
-```
 
-### 7.1 Schiefes Tableau aus Formen erzeugen
+**Validierung:**
+
+- Die Eingabe muss eine Folge von Zeilen sein; Einträge müssen positive ganze
+  Zahlen sein.
+- `None` ist nur am Zeilenanfang erlaubt. Die daraus berechneten inneren
+  Zeilenlängen müssen absteigend sein.
+- Zeilen müssen schwach, Spalten streng steigend sein.
+- Ein Slide-Startpunkt muss ein Paar ganzer Zahlen sein und in
+  `S.inner_corners()` liegen.
+- Ungültige Eingaben ergeben `ValueError` oder `TypeError`.
+
+### 6.1 Skew-Tableau aus Formen erzeugen
 
 Wenn die äußere Form `lambda`, die innere Form `mu` und nur die tatsächlich
 gefüllten Einträge gegeben sind:
@@ -339,9 +324,17 @@ Dabei gilt:
 - `mu` muss in `lambda` liegen,
 - die Füllung enthält genau die Einträge, die nicht durch `None` abgedeckt sind.
 
+**Validierung:**
+
+- `lambda` und `mu` müssen gültige Partitionen mit positiven Teilen sein.
+- `mu` muss in `lambda` liegen.
+- Die Füllung muss zur Zeilenanzahl und zu den Zeilenlängen passen und darf
+  kein `None` enthalten.
+- Ungültige Eingaben ergeben `ValueError`.
+
 ---
 
-## 8. Robinson–Schensted
+## 7. Robinson–Schensted
 
 ```python
 P, Q = Tableau.Robinson_schensted([3, 1, 4, 2])
@@ -355,9 +348,17 @@ Die Eingabe muss eine Folge paarweise verschiedener positiver ganzer Zahlen
 sein. Für die klassische Permutationsversion verwendet man `1, ..., n` in
 beliebiger Reihenfolge.
 
+**Validierung:**
+
+- Die Eingabe muss eine iterierbare Folge sein.
+- Jeder Eintrag muss eine positive ganze Zahl sein; doppelte Werte werden
+  abgelehnt.
+- Werte müssen nicht lückenlos `1 ... n` sein. Die Reihenfolge der Werte bleibt
+  erhalten, die Positionen im Aufzeichnungstableau sind `1 ... n`.
+
 ---
 
-## 9. Partitionen
+## 8. Partitionen
 
 Die Partitionsfunktionen liegen in `src/partitions.py` und sind im
 interaktiven Modus als `part` verfügbar.
@@ -394,12 +395,21 @@ Wichtige Funktionen:
 Für normale Anwendungen reichen `partitions`, `partitions_list` und
 `count_partitions`.
 
+**Validierung:**
+
+- `n` muss eine ganze Zahl sein; `bool` wird abgelehnt.
+- Für negative `n` liefert `partitions` keine Partitionen und
+  `count_partitions` den Wert `0`. Für normale Anwendungen ist `n >= 0`.
+- `GPartitions` verlangt `n >= 1`.
+
 ---
 
-## 10. Vergleichsfunktionen
+## 9. Vergleichsfunktionen
 
 In `partitionen_vergleich.py` ist der Vergleich der Partitionsfunktion mit der
-Partitionsfunktion aus der GAP stdlib (nach python ported, um den Vergleich fairer zu machen)
+Partitionsfunktion aus der GAP-Standardbibliothek (nach Python portiert, um den
+Vergleich fairer zu machen):
+
 ```python
 print(partitionen_vergleich(30, listen=True))
 print(partitionen_vergleich(75))
@@ -420,9 +430,17 @@ Die Ausgabe bezeichnet die zweite Implementierung als „GAP“, weil die
 Funktionen aus der GAP-Standardbibliothek portiert wurden. Es wird aktuell
 kein externes GAP-Programm gestartet.
 
+**Validierung:**
+
+- `n` muss eine ganze Zahl `>= 0` sein.
+- `listen` muss exakt `True` oder `False` sein; andere Werte ergeben `TypeError`.
+- Für `listen=True` und `gleiche_partitionen` ist praktisch `n >= 1` nötig.
+- Wenn die Anzahlen der beiden Implementierungen nicht übereinstimmen, wird
+  `RuntimeError` ausgelöst.
+
 ---
 
-## 11. Unterliegende Funktionen: `t`
+## 10. Unterliegende Funktionen: `t`
 
 `src/tableau.py` enthält die eigentliche Implementierung. Im interaktiven Modus
 ist das Modul als `t` verfügbar. Die meisten Funktionen arbeiten direkt mit
@@ -446,24 +464,34 @@ Die Klassen `Tableau` und `SkewTableau` sind die bequemere, objektorientierte
 Schnittstelle. `t` ist nützlich, wenn man mit reinen Zeilenlisten arbeiten
 möchte.
 
+**Validierung:**
+
+- Die unterliegenden Funktionen prüfen dieselben Bedingungen wie die Klassen:
+  gültige Tableaux, Formen, Füllungen, Startpunkte und Permutationen.
+- Die Klassen sind die bequemere Schnittstelle und übernehmen die Prüfungen
+  für ihre Objekte.
+
 ---
 
-## 12. Eingabeformate und Validierung
+## 11. Eingabeformate und Validierung
 
-Die wichtigsten Formate:
+Die wichtigsten Formate und ihre Anforderungen:
 
-| Objekt | Format | Beispiel |
+| Objekt | Format | Erwartet |
 |---|---|---|
-| Tableau | Liste von Zeilenlisten | `[[1, 3], [2]]` |
-| schiefes Tableau | Zeilen mit führenden `None` | `[[None, 1, 2], [3]]` |
-| Form | Tupel oder Liste positiver Zahlen | `(3, 2)` |
-| Füllung | Liste von Zeilenlisten | `[[2, 4], [1, 3], [2, 4]]` |
-| Slide-Startpunkt | Paar `(Zeile, Spalte)` | `(0, 1)` |
-| Permutation | Liste verschiedener positiver Zahlen | `[3, 1, 4, 2]` |
-| Partition `n` | nichtnegative ganze Zahl | `75` |
+| Tableau | Liste/Tupel von Zeilenlisten | gültiges Tableau mit positiven Einträgen |
+| Tableau-Form | Tupel/Liste positiver ganzer Zahlen | nicht aufsteigende Zeilenlängen |
+| Zeileneinfügung `x` | positive ganze Zahl | gültiger neuer Eintrag |
+| Tableau-Produkt `U` | `Tableau` | gültiges Tableau |
+| schiefes Tableau | Zeilen mit führenden `None` | gültige Skew-Form |
+| `lambda`, `mu`, Füllung | Partitionen und Zeilenlisten | `mu` in `lambda`, passende Füllung |
+| Slide-Startpunkt | Paar `(Zeile, Spalte)` | innere Ecke |
+| Robinson–Schensted-Eingabe | Folge verschiedener positiver `int` | gültige Folge |
+| Partition `n` | nichtnegative ganze Zahl | `int >= 0` |
+| `listen` | exakt `True` oder `False` | boolescher Wert |
+| GUI-Eingabe | Python-Literal | gültiges Literal |
 
-Die Konstruktoren und öffentlichen Funktionen prüfen ihre Eingaben. Typische
-Fehler sind:
+Typische Fehler sind:
 
 - negative oder nicht-ganzzahlige Einträge,
 - Zeilen, die nicht schwach steigen,
@@ -471,14 +499,15 @@ Fehler sind:
 - `None` an einer anderen Stelle als am Zeilenanfang,
 - eine innere Form, die nicht in der äußeren Form liegt,
 - eine Füllung mit falscher Zeilenlänge,
-- ein Slide-Startpunkt, der keine innere Ecke ist.
+- ein Slide-Startpunkt, der keine innere Ecke ist,
+- ein nicht-boolescher Wert für `listen`.
 
-Solche Fälle führen zu `ValueError` oder `TypeError`. In der grafischen
-Oberfläche werden sie abgefangen und im Ausgabefeld angezeigt.
+Solche Fälle führen zu `ValueError` oder `TypeError`. Die GUI fängt diese Fehler
+ab und zeigt sie im Ausgabefeld an.
 
 ---
 
-## 13. Dateien im Projekt
+## 12. Dateien im Projekt
 
 | Datei | Inhalt |
 |---|---|
@@ -491,19 +520,76 @@ Oberfläche werden sie abgefangen und im Ausgabefeld angezeigt.
 
 ---
 
-## 14. Häufige Probleme
+## 13. Häufige Probleme
 
 ### `ModuleNotFoundError: No module named 'src'`
 
 Dann wurde `main.py` nicht aus dem Projektordner gestartet. Wechsle in den
 Ordner, in dem `main.py` liegt, und starte das Programm erneut.
 
-### `ModuleNotFoundError: No module named 'tkinter'`
-
-`tkinter` fehlt. Installiere es, zum Beispiel unter Debian/Ubuntu mit
-`sudo apt install python3-tk`.
-
 ### Farbcodes im Terminal
 
 Die Farben werden nur ausgegeben, wenn die Ausgabe direkt im Terminal landet.
 Bei Umleitungen oder gesetzter `NO_COLOR`-Variable bleibt die Ausgabe normal.
+
+---
+
+## 14. Grafische Oberfläche: `gui()`
+
+Die GUI ist optional. Starten mit:
+
+```sh
+python main.py gui
+```
+
+oder aus der interaktiven Konsole:
+
+```python
+gui()
+```
+
+Die Oberfläche hat sechs Seiten:
+
+| Seite | Eingabe | Bedeutung |
+|---|---|---|
+| Partitionen | `75` | zeigt die Partitionen und ihre Anzahl |
+| Standardtableaux | `(3, 2)` oder `5` | Form oder Anzahl der Kästchen |
+| Zeileneinfügung | `[[1, 3], [2]]`, `1` | Tableau und neuer Eintrag |
+| Tableau-Produkt | `[[1, 3], [2]]`, `[[1, 2]]` | zwei Tableaux |
+| Jeu de taquin | `[[None, None, 1, 2], [1, 3], [2]]`, `(0, 1)` | schiefes Tableau und Startpunkt |
+| Robinson–Schensted | `[3, 1, 4, 2]` | Folge verschiedener positiver Zahlen |
+
+Die Eingabefelder erwarten **Python-Literale**:
+
+- Zahl: `75`
+- Tupel: `(3, 2)`
+- Liste: `[3, 1, 4, 2]`
+- verschachtelte Liste: `[[1, 3], [2]]`
+- leerer Platzhalter in schiefen Tableaux: `None`
+
+Ausdrücke wie `2 + 2` oder Variablennamen wie `n` sind nicht erlaubt.
+
+**Validierung in der GUI:**
+
+- Eingaben müssen gültige Python-Literale sein; Syntaxfehler werden abgefangen.
+- Tabellen und Zeilen müssen Listen oder Tupel sein.
+- `n` muss eine nichtnegative ganze Zahl sein.
+- Formen, Tableaux, Skew-Tableaux und Slide-Startpunkte werden nach denselben
+  Regeln wie oben geprüft.
+- Fehler werden im Ausgabefeld angezeigt; das Programm stürzt nicht ab.
+
+Auf der Seite „Jeu de taquin“ gibt es drei Aktionen:
+
+- **Rektifizieren**: reduziert das schiefe Tableau vollständig,
+- **Ein Slide**: führt einen Slide ab dem angegebenen Startpunkt aus,
+- **Formen und Ecken**: zeigt äußere Form, innere Form und innere Ecken.
+
+Der Startpunkt eines Slides ist ein Paar `(Zeile, Spalte)`, beginnend bei `0`.
+Mögliche Startpunkte liefert `S.inner_corners()`.
+
+### Probleme mit der GUI
+
+#### `ModuleNotFoundError: No module named 'tkinter'`
+
+`tkinter` fehlt. Installiere es, zum Beispiel unter Debian/Ubuntu mit
+`sudo apt install python3-tk`.

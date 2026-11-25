@@ -3,10 +3,6 @@ import sys
 from itertools import islice
 
 from partitionen_vergleich import gleiche_partitionen, partitionen_vergleich
-# from src.Tableau import (
-#     Tableau, count_partitions, inner_corners, partitions, jeu_de_taquin_slide,
-#     make_skew, partitions_list, rectify, robinson_schensted, skew_shapes,
-# )
 from src.Tableau import Tableau, SkewTableau
 import src.tableau as t
 import src.partitions as part
@@ -19,7 +15,6 @@ BLUE = "\033[94m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 RED = "\033[91m"
-
 
 def farbig(text, farbe):
     """Färbt Text im Terminal; bei Umleitung oder NO_COLOR unverändert."""
