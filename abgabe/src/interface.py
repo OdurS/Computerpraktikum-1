@@ -2,16 +2,26 @@ import tkinter as tk
 from ast import literal_eval
 from itertools import islice
 
-from tableau import (
-    Tableau,
-    count_partitions,
-    inner_corners,
-    partitions_list,
-    jeu_de_taquin_slide,
-    rectify,
-    robinson_schensted,
-    skew_shapes,
-)
+try:
+    from .Tableau import Tableau
+    from .tableau import (
+        inner_corners,
+        jeu_de_taquin_slide,
+        rectify,
+        robinson_schensted,
+        skew_shapes,
+    )
+    from .partitions import count_partitions, partitions_list
+except ImportError:  # direkter Start aus dem src-Ordner
+    from Tableau import Tableau
+    from tableau import (
+        inner_corners,
+        jeu_de_taquin_slide,
+        rectify,
+        robinson_schensted,
+        skew_shapes,
+    )
+    from partitions import count_partitions, partitions_list
 
 HINTERGRUND = "#20243C"
 TEXTFARBE = "#FFFFFF"
@@ -73,9 +83,9 @@ def standardtableaux_anzeigen(eingabe):
     if type(eingabe) is int:
         if eingabe < 0:
             raise ValueError("n muss nichtnegativ sein.")
-        tableaus = Tableau.iter_standard_tableaux(eingabe)
+        tableaus = Tableau.Iter_Standard_Tableaux(eingabe)
     else:
-        tableaus = Tableau.iter_standard_tableaux_corners(folge(eingabe))
+        tableaus = Tableau.Iter_Standard_Tableaux_Corners(folge(eingabe))
 
     vorschau = list(islice(tableaus, VORSCHAU + 1))
     text = "\n\n".join(map(str, vorschau[:VORSCHAU]))
@@ -196,6 +206,8 @@ class Programm:
                 text = f"Ungültige Eingabe. {fehler}"
             except RecursionError:
                 text = "Diese Form ist zu groß für den rekursiven Generator."
+            except Exception as fehler:
+                text = f"Unerwarteter Fehler. {fehler}"
 
             ergebnis.configure(state="normal")
             ergebnis.delete("1.0", "end")

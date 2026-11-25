@@ -11,9 +11,9 @@ def _pruefe_n(n):
 
 def partitionen_vergleich(n, listen=False):
     _pruefe_n(n)
-#     if type(listen) is not bool:
-#         raise TypeError("listen muss True oder False sein.")
-#
+    if type(listen) is not bool:
+        raise TypeError("listen muss True oder False sein.")
+
     if listen:
         funktion_python = part.partitions_list
         funktion_gap = part.GPartitions

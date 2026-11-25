@@ -1,33 +1,54 @@
-from src import tableau as t
-from src import partitions as part
+try:
+    from . import tableau as t
+    from . import partitions as part
+except ImportError:  # direkter Start aus dem src-Ordner
+    import tableau as t
+    import partitions as part
+
 """Dünner Wrapper um tableau.py, wo alle Implementationen sind"""
+
+
+def _nichtnegative_ganzzahl(n):
+    if type(n) is not int or n < 0:
+        raise ValueError("n muss eine nichtnegative ganze Zahl sein.")
 
 
 class TableauBase:
     """Gemeinsame Basis für Tableaux: speichert die Zeilen und ihre Darstellung."""
 
     def __init__(self, rows):
-        self.rows = [list(row) for row in rows]
+        try:
+            self.rows = [list(row) for row in rows]
+        except TypeError as fehler:
+            raise ValueError("Ein Tableau muss eine Folge von Zeilen sein.") from fehler
 
     def __str__(self):
         if not self.rows:
             return "∅"
-        width = max((len(str(x)) for row in self.rows for x in row), default=1)
+
+        def zelle(x):
+            return "·" if x is None else str(x)
+
+        width = max((len(zelle(x)) for row in self.rows for x in row), default=1)
         lines = []
         for row in self.rows:
-            lines.append(" ".join(str(x).rjust(width) for x in row))
+            lines.append(" ".join(zelle(x).rjust(width) for x in row))
         return "\n".join(lines)
 
     def __repr__(self):
-        return f"Tableau{type(self).__name__}({self.rows})"
+        return f"{type(self).__name__}({self.rows!r})"
 
 
 class Tableau(TableauBase):
     """Standard-Tableau."""
 
     def __init__(self, rows):
+        try:
+            rows = [list(row) for row in rows]
+        except TypeError as fehler:
+            raise ValueError("Ein Tableau muss eine Folge von Zeilen sein.") from fehler
         t._check_tableau(rows)
-        self.rows = [list(row) for row in rows]
+        self.rows = rows
 
     def __eq__(self, other):
         if not isinstance(other, Tableau):
@@ -39,6 +60,8 @@ class Tableau(TableauBase):
         return tuple(len(row) for row in self.rows)
 
     def is_tableau(self):
+        if not self.rows:
+            return True
         prev = self.shape[0]
         for cur in self.shape:
             if prev < cur:
@@ -63,16 +86,17 @@ class Tableau(TableauBase):
 
     @classmethod
     def Robinson_schensted(cls, perm):
-        P,Q = t.robinson_schensted(perm)
-        return (Tableau(P), Tableau(Q))
-        # return list(cls.Iter_Standard_Tableaux(n))
+        P, Q = t.robinson_schensted(perm)
+        return cls(P), cls(Q)
 
     @classmethod
     def Standard_Tableaux(cls, n):
+        _nichtnegative_ganzzahl(n)
         return list(cls.Iter_Standard_Tableaux(n))
 
     @classmethod
     def Iter_Standard_Tableaux(cls, n):
+        _nichtnegative_ganzzahl(n)
         for shape in part.partitions(n):
             yield from cls.Iter_Standard_Tableaux_Corners(shape)
 
@@ -106,13 +130,20 @@ class Tableau(TableauBase):
         return t.outer_corners(self.shape)
 
     def row_insert(self, x):
-        return t._row_insert(self.rows,x)
+        return Tableau(t.row_insert(self.rows, x))
 
     def reading_word(self):
         return [x for row in reversed(self.rows) for x in row]
 
     def tableau_product_insertion(self, U):
-        return t.tableau_product_insertion(self.rows,U.rows)
+        if not isinstance(U, Tableau):
+            raise TypeError("U muss ein Tableau-Objekt sein.")
+        return Tableau(t.tableau_product_insertion(self.rows, U.rows))
+
+    def tableau_product_jdt(self, U):
+        if not isinstance(U, Tableau):
+            raise TypeError("U muss ein Tableau-Objekt sein.")
+        return Tableau(t.tableau_product_jdt(self.rows, U.rows))
 
 
     def __mul__(self, other):
@@ -132,8 +163,12 @@ class SkewTableau(TableauBase):
     """Skew Tableau: None-Eintraege am Zeilenanfang markieren die innere Form."""
 
     def __init__(self, rows):
+        try:
+            rows = [list(row) for row in rows]
+        except TypeError as fehler:
+            raise ValueError("Ein schiefes Tableau muss eine Folge von Zeilen sein.") from fehler
         t.skew_shapes(rows)
-        self.rows = [list(row) for row in rows]
+        self.rows = rows
 
     @classmethod
     def Skew_Tableaux(cls,T, U):
@@ -155,7 +190,7 @@ class SkewTableau(TableauBase):
     def is_skew(self):
         try:
             t.skew_shapes(self.rows)
-        except ValueError:
+        except (TypeError, ValueError):
             return False
         return True
 
@@ -173,7 +208,7 @@ class SkewTableau(TableauBase):
         return self.rows == other.rows
 
     def jeu_de_taquin(self, x):
-        return t.jeu_de_taquin_slide(self.rows, x)
+        return SkewTableau(t.jeu_de_taquin_slide(self.rows, x))
 
     def rectify(self):
         """Reduziert das Skew Tableau per Jeu de Taquin zu einem Standardtableau."""

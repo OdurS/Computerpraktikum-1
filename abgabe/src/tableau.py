@@ -4,7 +4,10 @@ from bisect import bisect_right
 ## wobei n die Anzahl der Zeilen ist
 ## Insgesamt also O(n)
 def _shape(shape):
-    shape = tuple(shape)
+    try:
+        shape = tuple(shape)
+    except TypeError as fehler:
+        raise ValueError("Die Form muss eine Folge positiver ganzer Zahlen sein.") from fehler
     if any(type(x) is not int or x <= 0 for x in shape):
         raise ValueError("Die Zeilenlängen müssen positive ganze Zahlen sein.")
     if any(a < b for a, b in zip(shape, shape[1:])):
@@ -19,7 +22,11 @@ def outer_corners(shape):
 
 
 def is_semistandard(T):
+    if not isinstance(T, (list, tuple)):
+        return False
     for r, row in enumerate(T):
+        if not isinstance(row, (list, tuple)):
+            return False
         if not row or (r and len(row) > len(T[r - 1])):
             return False
         for c, x in enumerate(row):
@@ -45,7 +52,8 @@ def make_product_skew(T, U):
     _check_tableau(T)
     _check_tableau(U)
     width = len(T[0]) if T else 0
-    return [[None] * width + row for row in U] + [row[:] for row in T]
+    return ([[None] * width + list(row) for row in U]
+            + [list(row) for row in T])
 
 #TODO: Laufzeit
 def tableau_product_jdt(T, U):
@@ -68,11 +76,21 @@ def _row_insert(T, x):
     return len(T) - 1, 0
 
 
+def row_insert(T, x):
+    """Fügt x in T ein und gibt ein neues Tableau zurück."""
+    _check_tableau(T)
+    if type(x) is not int or x < 1:
+        raise ValueError("Der neue Eintrag muss eine positive ganze Zahl sein.")
+    result = [list(row) for row in T]
+    _row_insert(result, x)
+    return result
+
+
 ## TODO: Zeitkomplexität
 def tableau_product_insertion(T, U):
     _check_tableau(T)
     _check_tableau(U)
-    result = T
+    result = [list(row) for row in T]
     for row in reversed(U):
         for x in row:
             _row_insert(result, x)
@@ -88,6 +106,10 @@ def tableau_product_insertion(T, U):
 ## Desweiteren gilt offensichtlich mu <= lam (also mu liegt in mu), hat also weniger
 ## Elemente. Dadurch folgt, dass die letzte Schleife auch durch O(N) begrenzt ist.
 def skew_shapes(S):
+    if not isinstance(S, (list, tuple)) or any(
+        not isinstance(row, (list, tuple)) for row in S
+    ):
+        raise ValueError("S muss eine Liste von Zeilen sein.")
     lam = list(_shape(len(row) for row in S))
     mu = []
     for r, row in enumerate(S):
@@ -121,7 +143,10 @@ def make_skew(lam, mu, filling):
     lam, mu = _shape(lam), _shape(mu)
     if len(mu) > len(lam) or any(a > b for a, b in zip(mu, lam)):
         raise ValueError("Die innere Form muss in der äußeren Form liegen.")
-    filling = [list(row) for row in filling]
+    try:
+        filling = [list(row) for row in filling]
+    except TypeError as fehler:
+        raise ValueError("Die Füllung muss eine Folge von Zeilen sein.") from fehler
     if len(filling) != len(lam):
         raise ValueError("Die Anzahl der Füllungszeilen passt nicht zur Form.")
     result = []
@@ -167,7 +192,10 @@ def _slide(S, corner):
 ## 2 und R, der Anzahl der Reihen von S, wobei offensichtlich R <= R+L gilt.
 ## Ingesamt ist es also O(R + R+ L) = O(R+L) = O(_shape)
 def jeu_de_taquin_slide(S, corner):
-    corner = tuple(corner)
+    try:
+        corner = tuple(corner)
+    except TypeError as fehler:
+        raise ValueError("Der Startpunkt muss ein Paar (Zeile, Spalte) sein.") from fehler
     if (len(corner) != 2 or any(type(x) is not int for x in corner)
             or corner not in inner_corners(S)):
         raise ValueError("Der Startpunkt muss eine entfernbare Ecke der inneren Form sein.")
@@ -197,7 +225,10 @@ def rectify(S):
 ## Wobei der log_2 Term von dem binary Search kommt (schneller als naive Suche)
 def robinson_schensted(perm):
     """Fügt eine Folge paarweise verschiedener positiver ganzer Zahlen ein."""
-    perm = list(perm)
+    try:
+        perm = list(perm)
+    except TypeError as fehler:
+        raise ValueError("Die Eingabe muss eine Folge positiver ganzer Zahlen sein.") from fehler
     seen = set()
     for x in perm:
         if type(x) is not int or x < 1:
@@ -206,7 +237,7 @@ def robinson_schensted(perm):
             raise ValueError(f"Die Zahl {x} kommt mehrfach vor.")
         seen.add(x)
 
-    P, Q = [row for row in []], [ row for row in []]
+    P, Q = [], []
     for k, x in enumerate(perm, start=1):
         r, _ = _row_insert(P, x)
         if r == len(Q):

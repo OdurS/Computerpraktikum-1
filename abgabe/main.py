@@ -61,7 +61,7 @@ def main():
     print(S.rectify())
 
     print("\nRobinson–Schensted für", perm)
-    P, Q = tabby.t.robinson_schensted(perm)
+    P, Q = tabby.Tableau.Robinson_schensted(perm)
     print("Einfügungstableau P")
     print(P)
     print("Aufzeichnungstableau Q")
@@ -73,5 +73,17 @@ def main():
     print("Inhaltsvergleich für n = 5:", gleiche_partitionen(5))
 
 
+def gui():
+    """Startet die grafische Oberfläche aus src/interface.py."""
+    from src.interface import main as interface_main
+
+    interface_main()
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if sys.argv[1:] == ["gui"]:
+        gui()
+    else:
+        main()
